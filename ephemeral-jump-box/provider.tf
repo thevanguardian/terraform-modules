@@ -9,4 +9,9 @@ terraform {
 }
 
 provider "aws" {
+  default_tags {
+    tags = {
+      TTL = var.ttl
+    }
+  }
 }
