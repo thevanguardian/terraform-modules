@@ -1,4 +1,5 @@
 resource "aws_instance" "this" {
+  for_each               = toset(var.instance_identifiers)
   ami                    = data.aws_ami.this.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
@@ -15,6 +16,7 @@ resource "aws_instance" "this" {
   tags = {
     TTL             = tostring(var.ttl)
     SHUTDOWN_METHOD = var.instance_term_method
+    Name            = "${var.identifier}-${each.key}"
   }
 
   dynamic "instance_market_options" {
@@ -126,12 +128,13 @@ resource "aws_cloudwatch_event_rule" "ttl_enforcer_schedule" {
 }
 
 resource "aws_cloudwatch_event_target" "ttl_enforcer_lambda" {
+  for_each  = toset(var.instance_identifiers)
   rule      = aws_cloudwatch_event_rule.ttl_enforcer_schedule.name
-  target_id = "ttl-enforcer"
+  target_id = "ttl-enforcer: ${each.key}"
   arn       = aws_lambda_function.ttl_enforcer.arn
 
   input = jsonencode({
-    instance_id     = aws_instance.this.id
+    instance_id     = aws_instance.this[each.key].id
     ttl             = var.ttl
     shutdown_method = var.instance_term_method
   })

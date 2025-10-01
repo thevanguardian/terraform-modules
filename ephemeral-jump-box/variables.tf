@@ -157,3 +157,18 @@ variable "instance_term_method" {
     error_message = "The instance_term_method must be either 'terminate' or 'stop'."
   }
 }
+
+variable "instance_identifiers" {
+  description = "A list of identifiers (IDs or Names) used to identify and dictate the number of instances. If empty, no instances will be created."
+  type        = list(string)
+  default     = ["default"]
+
+  validation {
+    condition = alltrue([
+      for id in var.instance_identifiers : (
+        can(regex("^([a-zA-Z0-9-_]+)$", id))
+      )
+    ])
+    error_message = "Each instance identifier must be a valid Name (alphanumeric, hyphens, underscores)."
+  }
+}

@@ -3,13 +3,15 @@ output "ami_id" {
   value       = data.aws_ami.this.id
 }
 output "instance_attributes" {
-  description = "A map of basic attributes for the EC2 instance"
+  description = "A map of basic attributes for each EC2 instance"
   value = {
-    id         = aws_instance.this.id
-    arn        = aws_instance.this.arn
-    public_ip  = aws_instance.this.public_ip
-    private_ip = aws_instance.this.private_ip
-    state      = aws_instance.this.instance_state
+    for k, v in aws_instance.this : k => {
+      id         = v.id
+      arn        = v.arn
+      public_ip  = v.public_ip
+      private_ip = v.private_ip
+      state      = v.instance_state
+    }
   }
 }
 # output "lambda_arn" {
