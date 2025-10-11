@@ -1,6 +1,9 @@
 locals {
-  create_lambda       = var.reuse_lambda_arn == "" ? true : false
-  schedule_expression = "rate(${var.ttl} hour${var.ttl == 1 ? "" : "s"})"
+  create_lambda = var.reuse_lambda_arn == "" ? true : false
+  # schedule_expression = "rate(${var.ttl} hour${var.ttl == 1 ? "" : "s"})"
+
+  ttl_execution_time  = timeadd(timestamp(), "${var.ttl}h")
+  schedule_expression = formatdate("cron(%M %H %d %m ? %Y)", local.ttl_execution_time)
 }
 variable "identifier" {
   description = "A unique identifier for the jump box, used to create unique resource names."

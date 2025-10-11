@@ -34,19 +34,11 @@ data "archive_file" "ttl_enforcer_lambda" {
 data "aws_iam_policy_document" "ttl_enforcer_lambda_ec2" {
   statement {
     actions = [
-      "ec2:TerminateInstances",
-      "ec2:DescribeInstances"
+      "ec2:DescribeInstances",
+      "ec2:StopInstances",
+      "ec2:TerminateInstances"
     ]
-    resources = ["arn:aws:ec2:*:*:instance/*"]
-    condition {
-      test     = "StringLike"
-      variable = "ec2:ResourceTag/TTL"
-      values   = ["*"]
-    }
-    condition {
-      test     = "StringLike"
-      variable = "ec2:ResourceTag/SHUTDOWN_METHOD"
-      values   = ["*"]
-    }
+    # Dynamically include all instance ARNs
+    resources = [for instance in aws_instance.this : instance.arn]
   }
 }
