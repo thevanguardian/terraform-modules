@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: terraform-fmt-modified
+        name: terraform fmt (modified directories)
+        entry: scripts/pre-commit-terraform-fmt.sh
+        language: system
+        pass_filenames: false
+      - id: terraform-docs-readme
+        name: terraform-docs (modified directories)
+        entry: scripts/pre-commit-terraform-docs.sh
+        language: system
+        pass_filenames: false

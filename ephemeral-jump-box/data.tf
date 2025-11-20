@@ -1,6 +1,6 @@
 data "aws_ami" "this" {
   most_recent = true
-  owners      = var.ami_config.owner
+  owners      = var.ami_owner
 
   filter {
     name   = "name"
@@ -15,30 +15,68 @@ data "aws_ami" "this" {
     }
   }
 }
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+locals {
+  ssm_automation_documents = [
+    "AWS-StopEC2Instance",
+    "AWS-TerminateEC2Instance",
+  ]
+}
+
 data "aws_iam_policy_document" "ssm_assume_role_policy" {
   statement {
+    actions = ["sts:AssumeRole"]
+
     principals {
       type        = "Service"
       identifiers = ["ec2.amazonaws.com"]
     }
-    actions = ["sts:AssumeRole"]
   }
 }
 
-data "archive_file" "ttl_enforcer_lambda" {
-  type        = "zip"
-  source_file = "${path.module}/src/ttl_enforcer.py"
-  output_path = "${path.module}/ttl_enforcer_lambda.zip"
+data "aws_iam_policy_document" "automation_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ssm.amazonaws.com"]
+    }
+  }
 }
 
-data "aws_iam_policy_document" "ttl_enforcer_lambda_ec2" {
+data "aws_iam_policy_document" "automation_policy" {
   statement {
     actions = [
       "ec2:DescribeInstances",
-      "ec2:StopInstances",
-      "ec2:TerminateInstances"
+      "ec2:TerminateInstances",
+      "ec2:StopInstances"
     ]
-    # Dynamically include all instance ARNs
-    resources = [for instance in aws_instance.this : instance.arn]
+    resources = ["*"]
+  }
+}
+
+data "aws_iam_policy_document" "scheduler_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "scheduler_policy" {
+  statement {
+    actions = ["ssm:StartAutomationExecution"]
+    resources = [
+      for name in local.ssm_automation_documents :
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:automation-definition/${name}:*"
+    ]
   }
 }

@@ -117,61 +117,19 @@ variable "instance_profile" {
     condition     = var.instance_profile == "" || can(regex("^[a-zA-Z0-9+=,.@_-]+$", var.instance_profile))
     error_message = "The instance_profile must be empty or a valid IAM instance profile name."
   }
-}
-variable "spot_instance_config" {
-  description = "A map of spot instance configuration options (e.g., max_price, interruption_behavior). Leave empty for on-demand."
-  type        = map(string)
-  default = {
-    max_price             = 0.23
-    interruption_behavior = "terminate"
-  }
 
   validation {
-    condition = alltrue([
-      for k, v in var.spot_instance_config : (
-        can(regex("^(max_price|interruption_behavior)$", k)) &&
-        (
-          (k == "max_price" && can(regex("^[0-9]+(\\.[0-9]{1,6})?$", v))) ||
-          (k == "interruption_behavior" && contains(["terminate", "stop", "hibernate"], v))
-        )
-      )
-    ])
-    error_message = "Valid keys: max_price (numeric string), interruption_behavior (terminate|stop|hibernate)."
+    condition     = var.create_ssm_role || var.instance_profile != ""
+    error_message = "Set instance_profile when create_ssm_role is false."
   }
 }
 
-variable "reuse_lambda_arn" {
-  description = "The ARN of an existing Lambda function to reuse for cleanup. If not set, a new Lambda function will be created."
+variable "teardown_action" {
+  description = "Action for TTL enforcement: stop leaves the instance for later inspection; terminate deletes it."
   type        = string
-  default     = ""
 
   validation {
-    condition     = var.reuse_lambda_arn == "" || can(regex("^arn:aws:lambda:[a-z]{2}-[a-z]+-[0-9]:[0-9]{12}:function:[a-zA-Z0-9-_]+$", var.reuse_lambda_arn))
-    error_message = "The reuse_lambda_arn must be empty or a valid Lambda function ARN."
-  }
-}
-variable "instance_term_method" {
-  description = "The method to terminate the instance (e.g., 'terminate', 'stop')."
-  type        = string
-  default     = "terminate"
-
-  validation {
-    condition     = contains(["terminate", "stop"], var.instance_term_method)
-    error_message = "The instance_term_method must be either 'terminate' or 'stop'."
-  }
-}
-
-variable "instance_identifiers" {
-  description = "A list of identifiers (IDs or Names) used to identify and dictate the number of instances. If empty, no instances will be created."
-  type        = list(string)
-  default     = ["default"]
-
-  validation {
-    condition = alltrue([
-      for id in var.instance_identifiers : (
-        can(regex("^([a-zA-Z0-9-_]+)$", id))
-      )
-    ])
-    error_message = "Each instance identifier must be a valid Name (alphanumeric, hyphens, underscores)."
+    condition     = contains(["stop", "terminate"], var.teardown_action)
+    error_message = "teardown_action must be one of: stop, terminate."
   }
 }

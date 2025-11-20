@@ -1,3 +1,8 @@
+locals {
+  teardown_time     = timeadd(timestamp(), format("%dh", var.ttl))
+  teardown_document = var.teardown_action == "stop" ? "AWS-StopEC2Instance" : "AWS-TerminateEC2Instance"
+}
+
 resource "aws_instance" "this" {
   for_each               = toset(var.instance_identifiers)
   ami                    = data.aws_ami.this.id
@@ -10,6 +15,7 @@ resource "aws_instance" "this" {
     volume_type           = var.storage_type
     delete_on_termination = true
   }
+
 
   iam_instance_profile = var.create_ssm_role ? aws_iam_instance_profile.ssm[0].name : var.instance_profile
 
@@ -70,80 +76,47 @@ resource "aws_iam_instance_profile" "ssm" {
   role  = aws_iam_role.ssm[0].name
 }
 
-resource "aws_lambda_function" "ttl_enforcer" {
-  filename         = data.archive_file.ttl_enforcer_lambda.output_path
-  function_name    = "${var.identifier}-ttl-enforcer"
-  role             = aws_iam_role.ttl_enforcer_lambda.arn
-  handler          = "ttl_enforcer.lambda_handler"
-  runtime          = "python3.9"
-  source_code_hash = data.archive_file.ttl_enforcer_lambda.output_base64sha256
+resource "aws_iam_role" "automation" {
+  name               = "${var.identifier}-automation"
+  assume_role_policy = data.aws_iam_policy_document.automation_assume_role.json
+}
 
-  environment {
-    variables = {
-      TTL             = var.ttl
-      SHUTDOWN_METHOD = var.instance_term_method
-    }
+resource "aws_iam_role_policy" "automation" {
+  name   = "${var.identifier}-automation"
+  role   = aws_iam_role.automation.name
+  policy = data.aws_iam_policy_document.automation_policy.json
+}
+
+resource "aws_iam_role" "scheduler" {
+  name               = "${var.identifier}-scheduler"
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume_role_policy.json
+}
+
+resource "aws_iam_role_policy" "scheduler" {
+  name   = "${var.identifier}-scheduler"
+  role   = aws_iam_role.scheduler.name
+  policy = data.aws_iam_policy_document.scheduler_policy.json
+}
+
+resource "aws_scheduler_schedule" "teardown" {
+  name                = "${var.identifier}-teardown"
+  state               = "ENABLED"
+  schedule_expression = format("at(%s)", local.teardown_time)
+
+  flexible_time_window {
+    mode = "OFF"
   }
 
-  tags = {
-    Name = "${var.identifier}-ttl-enforcer"
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:ssm:startAutomationExecution"
+    role_arn = aws_iam_role.scheduler.arn
+
+    input = jsonencode({
+      DocumentName = local.teardown_document
+      Parameters = {
+        InstanceId           = [aws_instance.this.id]
+        AutomationAssumeRole = [aws_iam_role.automation.arn]
+      }
+    })
   }
-}
-
-resource "aws_iam_role" "ttl_enforcer_lambda" {
-  name = "${var.identifier}-ttl-enforcer-lambda-role"
-
-  assume_role_policy = data.aws_iam_policy_document.ttl_enforcer_lambda_assume.json
-
-  tags = {
-    Name = "${var.identifier}-ttl-enforcer-lambda-role"
-  }
-}
-
-data "aws_iam_policy_document" "ttl_enforcer_lambda_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "ttl_enforcer_lambda_basic" {
-  role       = aws_iam_role.ttl_enforcer_lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy" "ttl_enforcer_lambda_ec2" {
-  name = "${var.identifier}-ttl-enforcer-ec2-policy"
-  role = aws_iam_role.ttl_enforcer_lambda.id
-
-  policy = data.aws_iam_policy_document.ttl_enforcer_lambda_ec2.json
-}
-
-resource "aws_cloudwatch_event_rule" "ttl_enforcer_schedule" {
-  name                = "${var.identifier}-ttl-enforcer-schedule"
-  schedule_expression = local.schedule_expression
-}
-
-resource "aws_cloudwatch_event_target" "ttl_enforcer_lambda" {
-  for_each  = toset(var.instance_identifiers)
-  rule      = aws_cloudwatch_event_rule.ttl_enforcer_schedule.name
-  target_id = "ttl-enforcer: ${each.key}"
-  arn       = aws_lambda_function.ttl_enforcer.arn
-
-  input = jsonencode({
-    instance_id     = aws_instance.this[each.key].id
-    ttl             = var.ttl
-    shutdown_method = var.instance_term_method
-  })
-}
-
-resource "aws_lambda_permission" "allow_eventbridge" {
-  statement_id  = "AllowExecutionFromEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.ttl_enforcer.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.ttl_enforcer_schedule.arn
 }
