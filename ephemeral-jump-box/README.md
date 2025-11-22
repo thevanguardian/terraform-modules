@@ -1,7 +1,7 @@
 # terraform-aws-ephemeral-jump-box **v0.0.1**
 
-An opinionated Terraform module that spins up an Amazon Linux jump box, wires it to AWS Systems Manager Session Manager, and schedules a one-time EventBridge/SSM automation run to stop or terminate it after a configurable TTL.
-The design keeps the compute footprint short-lived, enforces tagging/SSM hardening, and exposes simple switches for teams that need auditable forensic windows (stop) or full teardown (terminate).
+A plug-and-play module that launches a temporary, SSM-managed bastion host and tags it for scheduled stop/terminate after a configurable TTL.
+Ideal for just-in-time access scenarios where you want a short-lived jump box without long-term persistence.
 
 ---
 
@@ -26,13 +26,14 @@ module "jump_box" {
 
 ```hcl
 locals {
-  auditors = ["alice@example.com", "bob@example.com"]
+  auditors = ["alice", "bob"]
 }
 
 module "ephemeral_jump_box" {
+  for_each = toset(local.auditors)
   source = "git::https://gitlab.com/thevanguardian/terraform-modules.git//ephemeral-jump-box?ref=v0.0.1"
 
-  identifier      = "ir-jumpbox"
+  identifier      = "ir-${each.key}"
   vpc_id          = module.shared_vpc.id
   subnet_id       = module.shared_vpc.private_subnet_ids[0]
   instance_type   = "t3.small"
@@ -56,11 +57,6 @@ module "ephemeral_jump_box" {
   create_ssm_role   = false
   instance_profile  = aws_iam_instance_profile.jump_box.name
 
-}
-
-output "jump_box_ami" {
-  description = "AMI that backed the ephemeral jump box"
-  value       = module.ephemeral_jump_box.ami_id
 }
 ```
 
@@ -128,6 +124,5 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_ami_id"></a> [ami\_id](#output\_ami\_id) | The ID of the selected AMI |
-| <a name="output_instance_attributes"></a> [instance\_attributes](#output\_instance\_attributes) | A map of basic attributes for each EC2 instance |
+| <a name="output_instance_attributes"></a> [instance\_attributes](#output\_instance\_attributes) | Basic attributes for the jump box instance |
 <!-- END_TF_DOCS -->
