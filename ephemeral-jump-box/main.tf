@@ -1,14 +1,8 @@
-locals {
-  teardown_time     = timeadd(timestamp(), format("%dh", var.ttl))
-  teardown_document = var.teardown_action == "stop" ? "AWS-StopEC2Instance" : "AWS-TerminateEC2Instance"
-}
-
 resource "aws_instance" "this" {
-  for_each               = toset(var.instance_identifiers)
   ami                    = data.aws_ami.this.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
-  vpc_security_group_ids = var.security_group_ids
+  vpc_security_group_ids = length(var.security_group_ids) > 0 ? var.security_group_ids : [aws_security_group.this.id]
 
   root_block_device {
     volume_size           = var.storage_size
@@ -16,13 +10,12 @@ resource "aws_instance" "this" {
     delete_on_termination = true
   }
 
-
   iam_instance_profile = var.create_ssm_role ? aws_iam_instance_profile.ssm[0].name : var.instance_profile
 
   tags = {
     TTL             = tostring(var.ttl)
-    SHUTDOWN_METHOD = var.instance_term_method
-    Name            = "${var.identifier}-${each.key}"
+    SHUTDOWN_METHOD = var.teardown_action
+    Name            = var.identifier
   }
 
   dynamic "instance_market_options" {

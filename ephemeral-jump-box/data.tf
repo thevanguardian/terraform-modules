@@ -1,6 +1,6 @@
 data "aws_ami" "this" {
   most_recent = true
-  owners      = var.ami_owner
+  owners      = var.ami_config.owner
 
   filter {
     name   = "name"

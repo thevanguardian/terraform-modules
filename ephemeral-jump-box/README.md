@@ -76,8 +76,7 @@ output "jump_box_ami" {
 
 | Name | Version |
 |------|---------|
-| <a name="provider_archive"></a> [archive](#provider\_archive) | 2.7.1 |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 5.0 |
 
 ## Modules
 
@@ -111,17 +110,13 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_ami_filters"></a> [ami\_filters](#input\_ami\_filters) | A map of additional filters to apply when searching for the AMI. | `map(string)` | <pre>{<br/>  "state": "available"<br/>}</pre> | no |
-| <a name="input_ami_name"></a> [ami\_name](#input\_ami\_name) | The name of the AMI to use for the jump box. | `string` | `"amzn2-ami-hvm-*-x86_64-gp2"` | no |
-| <a name="input_ami_owner"></a> [ami\_owner](#input\_ami\_owner) | A list of AMI owners (AWS account IDs or 'amazon') to use for the jump box. | `list(string)` | <pre>[<br/>  "amazon"<br/>]</pre> | no |
+| <a name="input_ami_config"></a> [ami\_config](#input\_ami\_config) | A map of AMI configuration options (owner, name, filters). | <pre>object({<br/>    owner   = list(string)<br/>    name    = string<br/>    filters = map(string)<br/>  })</pre> | <pre>{<br/>  "filters": {<br/>    "state": "available"<br/>  },<br/>  "name": "amzn2-ami-hvm-*-x86_64-gp2",<br/>  "owner": [<br/>    "amazon"<br/>  ]<br/>}</pre> | no |
 | <a name="input_create_ssm_role"></a> [create\_ssm\_role](#input\_create\_ssm\_role) | Whether to create an IAM role for SSM access. | `bool` | `true` | no |
-| <a name="input_create_temp_iam_user"></a> [create\_temp\_iam\_user](#input\_create\_temp\_iam\_user) | Whether to create a temporary IAM user for the jump box. | `bool` | `true` | no |
 | <a name="input_identifier"></a> [identifier](#input\_identifier) | A unique identifier for the jump box, used to create unique resource names. | `string` | `"jump-box"` | no |
 | <a name="input_instance_profile"></a> [instance\_profile](#input\_instance\_profile) | The name of an existing IAM instance profile to attach to the jump box. If not set, a new one may be created. | `string` | `""` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | The type of EC2 instance to use for the jump box. | `string` | `"t3.micro"` | no |
-| <a name="input_reuse_lambda_arn"></a> [reuse\_lambda\_arn](#input\_reuse\_lambda\_arn) | The ARN of an existing Lambda function to reuse for cleanup. If not set, a new Lambda function will be created. | `string` | `""` | no |
 | <a name="input_security_group_ids"></a> [security\_group\_ids](#input\_security\_group\_ids) | A list of security group IDs to associate with the jump box. | `list(string)` | `[]` | no |
-| <a name="input_spot_instance_config"></a> [spot\_instance\_config](#input\_spot\_instance\_config) | A map of spot instance configuration options (e.g., max\_price, interruption\_behavior). Leave empty for on-demand. | `map(string)` | <pre>{<br/>  "interruption_behavior": "terminate",<br/>  "max_price": 0.23<br/>}</pre> | no |
+| <a name="input_spot_instance_config"></a> [spot\_instance\_config](#input\_spot\_instance\_config) | Optional spot instance configuration; set to null to launch on-demand. | <pre>object({<br/>    max_price             = string<br/>    interruption_behavior = string<br/>  })</pre> | `null` | no |
 | <a name="input_storage_size"></a> [storage\_size](#input\_storage\_size) | The size of the root EBS volume in GB. | `number` | `8` | no |
 | <a name="input_storage_type"></a> [storage\_type](#input\_storage\_type) | The type of the root EBS volume (e.g., gp2, gp3, io1, st1). | `string` | `"gp3"` | no |
 | <a name="input_subnet_id"></a> [subnet\_id](#input\_subnet\_id) | The subnet ID where the jump box will be deployed. | `string` | n/a | yes |
@@ -134,5 +129,5 @@ No modules.
 | Name | Description |
 |------|-------------|
 | <a name="output_ami_id"></a> [ami\_id](#output\_ami\_id) | The ID of the selected AMI |
-| <a name="output_instance_attributes"></a> [instance\_attributes](#output\_instance\_attributes) | A map of basic attributes for the EC2 instance |
+| <a name="output_instance_attributes"></a> [instance\_attributes](#output\_instance\_attributes) | A map of basic attributes for each EC2 instance |
 <!-- END_TF_DOCS -->
